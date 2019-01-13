@@ -75,10 +75,6 @@ pogoasset:                   # Path to Pogo Assets: See: https://github.com/ZeCh
 #madmin_noresponsive         # MADmin deactivate responsive tables
 #unknown_gym_distance:       # MADmin show matchable gyms with this radius (Default: 10)
 
-# timezone settings
-######################
-
-#timezone:                   # Time difference from UTC (f.e "+2" for Berlin/Germany) - Needed for Rocketmap Database
 
 #sleeptimer settings
 ######################
