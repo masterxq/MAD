@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
 import sys
 
-from db.monocleWrapper import MonocleWrapper
-from db.rmWrapper import RmWrapper
-
 sys.path.append("..")  # Adds higher directory to python modules path.
 
 import threading
@@ -12,29 +9,36 @@ import time
 from flask import (Flask, jsonify, render_template,
                    request, send_from_directory, redirect)
 from flask_caching import Cache
-from utils.walkerArgs import parseArgs
+from utils.mappingParser import MappingParser
 import json
 import os, glob, platform
 import re
 import datetime
 from shutil import copyfile
 from math import floor
-import numbers
 
 app = Flask(__name__)
 cache = Cache(app, config={'CACHE_TYPE': 'simple'})
 
 log = logging.getLogger(__name__)
 
-args = parseArgs()
+args = None
+db_wrapper = None
+device_mappings = None
+routemanagers = None
+areas = None
 
-if args.db_method == "rm":
-    db_wrapper = RmWrapper(args, None)
-elif args.db_method == "monocle":
-    db_wrapper = MonocleWrapper(args, None)
-else:
-    log.error("Invalid db_method in config. Exiting")
-    sys.exit(1)
+
+def madmin_start(arg_args, arg_db_wrapper):
+    import json
+    global args, device_mappings, db_wrapper, routemanagers, areas
+    args = arg_args
+    db_wrapper = arg_db_wrapper
+    mapping_parser = MappingParser(arg_db_wrapper)
+    device_mappings = mapping_parser.get_devicemappings()
+    routemanagers = mapping_parser.get_routemanagers()
+    areas = mapping_parser.get_areas()
+    app.run(host=args.madmin_ip, port=int(args.madmin_port), threaded=True, use_reloader=False)
 
 
 # @app.before_first_request
@@ -430,23 +434,20 @@ def get_position():
     return jsonify(positionexport)
 
 
-@cache.cached()
 @app.route("/get_route")
 def get_route():
-    route = []
-    routeexport = {}
+    routeexport = []
 
-    for filename in glob.glob('*.calc'):
-        name = filename.split('.')
-        with open(filename, 'r') as f:
+    for name, area in areas.items():
+        route = []
+        with open(area['routecalc'] + '.calc', 'r') as f:
             for line in f.readlines():
                 latlon = line.strip().split(', ')
                 route.append([
                     getCoordFloat(latlon[0]),
                     getCoordFloat(latlon[1])
                 ])
-            routeexport[str(name[0])] = route
-            route = []
+            routeexport.append({'name': str(name), 'mode': area['mode'], 'coordinates': route})
 
     return jsonify(routeexport)
 
@@ -944,6 +945,20 @@ def creation_date(path_to_file):
 
 
 if __name__ == "__main__":
+    from utils.walkerArgs import parseArgs
+    from db.monocleWrapper import MonocleWrapper
+    from db.rmWrapper import RmWrapper
+
+    args = parseArgs()
+
+    if args.db_method == "rm":
+        db_wrapper = RmWrapper(args, None)
+    elif args.db_method == "monocle":
+        db_wrapper = MonocleWrapper(args, None)
+    else:
+        log.error("Invalid db_method in config. Exiting")
+        sys.exit(1)
+
     app.run()
     # host='0.0.0.0', port=int(args.madmin_port), threaded=False)
 
